@@ -42,7 +42,9 @@ df2=PimaIndiansDiabetes %>% filter(age>70)
 ```
 Q4. Complete the code block below to remove all samples that do have obviously incorrect values for either mass or pressure. (If something goes wrong then reload the data using the very first code block on line 18)
 ```{r}
-PimaIndiansDiabetes = PimaIndiansDiabetes %>% #Insert your code here
+table(PimaIndiansDiabetes$mass)
+table(PimaIndiansDiabetes$pressure)
+PimaIndiansDiabetes = PimaIndiansDiabetes %>% filter(mass>1, pressure>30)
 ```
 
 _ggplot_ is a popular package for creating visualizations in R, it takes data-frame objects as the input. Once again, an in depth introduction to _ggplot_ is beyond the scope of this course, however the following shows how to used _ggplot_ to generate a scatterplot of mass vs insulin with labeling of samples according to their diabetes test results.
@@ -52,14 +54,16 @@ ggplot(data=PimaIndiansDiabetes, aes(x=insulin, y=mass, col=diabetes)) + geom_po
 ```
 Q5. Adapt the _ggplot_ code to plot pressure on the y axis and mass on the x-axis.
 ```{r}
-#Insert your code here
+ggplot(data=PimaIndiansDiabetes, aes(x=mass, y=pressure, col=diabetes)) + geom_point()
 ```
 Q6. Examine your plot of blood pressure vs mass. Does it appear as though there is
+
  a) No correlation
- b) A positive correlation
- c) A negative correlation
+
 
 Q7. In the next code block we will use the _sample_ function to split our dataset into a training and test set. Before moving on try running "sample(1:5)" and "sample(1:5,3)" in your R session. What do you think this function does?
+
+Randomly order values for the given range
 
 The _set.seed_ function is a trick that allows you to regenerate the exact same "random" selection over and over again (so if you ever need to repeat an analysis later you can recreate the exact the same results). Use the following code to divide your data into training and test sets.
 ```{r}
@@ -71,16 +75,26 @@ test=PimaIndiansDiabetes[-index,]
 ```
 Q8. How many examples do your selected training and test sets include?
 
+test: 218 obs. of 9 variables
+train: 508 obs. of 9variables
 
 
 ## Linear regression & cross validation (40 mins)
 Use the _lm_ function to perform linear regression of pressure with respect to mass, and use _summary_ to see generate a description of the model. 
 ```{r}
 lm.fit=lm(pressure ~ mass, data=train)
+lm.fit2=lm(mass ~ pressure, data=train)
 summary(lm.fit)
+summary(lm.fit2)
 ```
 Q1. _Pr(>t)_ is the estimated probability of your observed training data if there had been no relationship between pressure and mass. Is the apparent relationship you observe between pressure and bmi beyond what can reasonably be attributed to coincidence? 
+
+Yes 
+
 Q2. What increase in blood pressure would the model predict if a person's bmi were to increase by 10?
+
+5.1
+
 
 Use the _predict_ function to generate predictions of pressure from mass in your training and test sets. 
 ```{r}
@@ -89,7 +103,7 @@ test$predPressure=predict(lm.fit,test)
 ```
 Q3. Adapt your previous ggplot code to now plot the observed pressure values against the predicted values for the training and test sets. (append _+ geom_abline(intercept=0,slope=1,col="blue")_ to add a line for perfect correlation)
 ```{r}
-#Insert your code here
+ggplot(data=PimaIndiansDiabetes, aes(x=mass, y=pressure, col=diabetes)) + geom_point()
 ```
 Q4. Does the model perform equally well for predicting low pressure values (<55), intermediate values (55-80) and the higher values (>80)? Why do you think this is?
 
