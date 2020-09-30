@@ -1,0 +1,227 @@
+# Supervised Learning Day I: Fundamentals Practical
+
+## Objectives
+In this session you will work with the Pima Indians Diabetes Database, a publicly available dataset commonly used to benchmark machine learning applications. You will
+* Prepare data for use in supervised learning applications (dataypes, basic visualizations, training & validation sets)
+* Use linear regression to predict continuous outcome variables (fitting the model, benchmarking)
+* Use logistic regression to predict a categorical outcome variable (fitting the model, benchmarking)
+* Use ridge & LASSO to perform regularized logistic regression (fitting the model, benchmarking)
+
+Insert your answers to the questions into the R markdown document as you go. Save your version of your markdown document as _"practical1_YourStudentNumber.Rmd"_. You will submit this at the end of the practical.
+
+Student Number: [Insert your student number here]
+
+---
+
+## The dataset (25mins)
+Use the following commands to load the _PimaIndiansDiabetes_ dataset from the _mlbench_ package and explore the information it contains.
+```{r}
+library(mlbench)
+data(PimaIndiansDiabetes)
+?PimaIndiansDiabetes
+View(PimaIndiansDiabetes)
+```
+Q1. How many continuous variables does the dataset contain?
+Q2. How many categorical variables does the dataset contain?
+
+The range function can be used to retrieve the min and max values within a given column. The table function can be used to count the number of observations across all observed values.
+```{r}
+range(PimaIndiansDiabetes$glucose)
+table(PimaIndiansDiabetes$pregnant)
+```
+Q3. How many samples in the dataset have a BMI value that looks suspicious?
+
+_dplyr_ is a popular package for data analysis in R, it includes functions to perform several data-frame operations in a convenient and efficient manner (filtering, sorting, grouping, summarizing). A full exploration of _dplyr_ is beyond the scope of this course, however the code below demonstrates how we can use dplyr to create a new data frame where all samples above the age of 70 have been removed.
+```{r}
+library(dplyr)
+df2=PimaIndiansDiabetes %>% filter(age>70)
+```
+Q4. Complete the code block below to remove all samples that do have obviously incorrect values for either mass or pressure. (If something goes wrong then reload the data using the very first code block on line 18)
+```{r}
+PimaIndiansDiabetes = PimaIndiansDiabetes %>% #Insert your code here
+```
+
+_ggplot_ is a popular package for creating visualizations in R, it takes data-frame objects as the input. Once again, an in depth introduction to _ggplot_ is beyond the scope of this course, however the following shows how to used _ggplot_ to generate a scatterplot of mass vs insulin with labeling of samples according to their diabetes test results.
+```{r}
+library(ggplot2)
+ggplot(data=PimaIndiansDiabetes, aes(x=insulin, y=mass, col=diabetes)) + geom_point()
+```
+Q5. Adapt the _ggplot_ code to plot pressure on the y axis and mass on the x-axis.
+```{r}
+#Insert your code here
+```
+Q6. Examine your plot of blood pressure vs mass. Does it appear as though there is
+ a) No correlation
+ b) A positive correlation
+ c) A negative correlation
+
+Q7. In the next code block we will use the _sample_ function to split our dataset into a training and test set. Before moving on try running "sample(1:5)" and "sample(1:5,3)" in your R session. What do you think this function does?
+
+The _set.seed_ function is a trick that allows you to regenerate the exact same "random" selection over and over again (so if you ever need to repeat an analysis later you can recreate the exact the same results). Use the following code to divide your data into training and test sets.
+```{r}
+set.seed(1234)
+m=nrow(PimaIndiansDiabetes)
+index=sample(1:m,round(0.7*m),replace=FALSE)
+train=PimaIndiansDiabetes[index,]
+test=PimaIndiansDiabetes[-index,]
+```
+Q8. How many examples do your selected training and test sets include?
+
+
+
+## Linear regression & cross validation (40 mins)
+Use the _lm_ function to perform linear regression of pressure with respect to mass, and use _summary_ to see generate a description of the model. 
+```{r}
+lm.fit=lm(pressure ~ mass, data=train)
+summary(lm.fit)
+```
+Q1. _Pr(>t)_ is the estimated probability of your observed training data if there had been no relationship between pressure and mass. Is the apparent relationship you observe between pressure and bmi beyond what can reasonably be attributed to coincidence? 
+Q2. What increase in blood pressure would the model predict if a person's bmi were to increase by 10?
+
+Use the _predict_ function to generate predictions of pressure from mass in your training and test sets. 
+```{r}
+train$predPressure=predict(lm.fit,train)
+test$predPressure=predict(lm.fit,test)
+```
+Q3. Adapt your previous ggplot code to now plot the observed pressure values against the predicted values for the training and test sets. (append _+ geom_abline(intercept=0,slope=1,col="blue")_ to add a line for perfect correlation)
+```{r}
+#Insert your code here
+```
+Q4. Does the model perform equally well for predicting low pressure values (<55), intermediate values (55-80) and the higher values (>80)? Why do you think this is?
+
+The following will return the difference between your model's predictions of pressure and the real pressure values observed in the test set
+```{r}
+test$pressure - test$predPressure
+```
+Q5. On average, how far off the real values were your predictions? (If your answer is <2 then look again...)
+
+Watch the first 6mins 20 secs of this introductory video to R-squared
+https://www.youtube.com/watch?v=2AQKmw14mHM
+
+Q6. In the code block below, _VarMean_ is the variation around the mean for pressure within your test set. Complete the code-block to calculate the R-squared for your model in the test set. (Hint:  _summary(lm.fit)_ shows you the correct R-squared for your model in the training set, you can check if your code works by first seeing if you can calculate the correct R-squared for the training set)
+```{r}
+VarMean=sum((test$pressure - mean(test$pressure))^2)
+VarLine=#Insert your code here
+Rsquared=#Insert your code here
+```
+
+Q7. Does your model achieve the same R-squared in your training and test sets? Explain why you might expect to see differences in model performance within the training and test sets?
+
+The _caret_ package is one of the most popular interfaces for machine learning in R (For a brief introduction see http://topepo.github.io/caret/index.html). The code below will use functions from _caret_ to perform linear regression with 10 fold cross validation and then return the R-squared values calculated during each cross validation. 
+```{r}
+library(caret)
+nfolds=trainControl(method = "cv", number = 10)
+lm.fit.cv=train(pressure ~ mass, data = PimaIndiansDiabetes, trControl = nfolds, method = "lm") 
+lm.fit.cv$resample$Rsquared
+```
+Q8. What was the average R-squared value across cross-validations?
+Q9. Which do you think is a more reliable indicator of model performance, the R-squared value you calculated in Q7 or the average R-squared value you calculated for Q8? Justify your answer
+
+
+## Logistic regression & Confusion Matrices (40 mins)
+The following code uses the _generalized linear model_ (glm) function to predict case-control status (diabetes positive or negative) from all other features in the data frame.
+```{r}
+set.seed(1234)
+m=nrow(PimaIndiansDiabetes)
+index=sample(1:m,round(0.7*m),replace=FALSE)
+train=PimaIndiansDiabetes[index,]
+test=PimaIndiansDiabetes[-index,]
+glm.fit=glm(diabetes ~ ., data=train,family="binomial")
+summary(glm.fit)
+```
+Q1. Which features from the dataset show a significant correlation with diabetes?
+Q2. _Hard question alert!!! (skip if you get stuck, we will discuss later)_ Is the feature with the largest Estimate by definition the most important in determining diabetes risk? Explain why. 
+
+The following code will use your model to predict risk of diabetes within the test set
+```{r}
+predict(glm.fit,test,type="response")
+```
+Q3. How many people from the test set are estimated to have an 80% probability for a positive test result?
+Q4. Rerun the prediction without specifying _type="response"_, ie run _predict(glm.fit,test)_. What do these values represent? (Hint - discussed during the lecture this morning...)
+Q5. _Second hard question alert!!! (skip if you get stuck, we will discuss later)_ The values you analyzed in Q7 represent the probabilities that a sample within your dataset receives a positive test result for diabetes. A model that uses the same feature to calculate an individual's risk of diabetes in the real world will not provide the same answer. Why?
+
+The following code will assign samples "neg" or "pos" values based on whether the predicted probabilities of a positive test results were greater than 50%. It will then use a function from the _caret_ function to generate a confusion matrix.
+```{r}
+test$predDiabetes=factor(ifelse(predict(glm.fit,test,type="response")<0.5,"neg","pos"),levels=c("neg","pos"))
+confusionMatrix(test$diabetes,test$predDiabetes)
+```
+Q6. How many true positives are there?
+Q7. How many false positives ares there?
+Q8. How many true negatives are there?
+Q9. How many false negatives are there?
+Q10. Is the model more likely to provide an underestimate or overestimate of the number of samples with positive diabetes test results?
+Q11. Which do you imagine is most important in this situation: high accuracy, high specificity or high sensitivity?
+
+Q12. Use the code below to refit your model using cross validation. What is the average accuracy across cv?
+```{r}
+nfolds=trainControl(method = "cv", number = 10)
+glm.fit.cv=train(diabetes ~ ., data = PimaIndiansDiabetes, trControl = nfolds, method = "glm", family="binomial")
+```
+
+
+## ROC (20mins)
+Q1. Adapt the code you used to generate _glm.fit_ to fit a logistic regression model where the only predictor variable considered is _glucose_ (call this _glm.fit.glucoseOnly_). For this excersize do not worry about cross validation and just use your original training dataset 
+```{r}
+glm.fit.glucoseOnly=#Insert your code here
+```
+
+The following code will use the _pROC_ package to generate ROC curves for your full _glm.fit_ model (all variables included) and your glucose only _glm.fit.glucoseOnly_ model. It will then generate a dataframe called _results_ which shows the sensitivity and specificity across a range of probability thresholds that could be used to classify test results as "pos" or "neg".
+```{r}
+library(pROC)
+par(pty="s")
+glm.fit.roc=plot(roc(test$diabetes,predict(glm.fit,test,type="response")),print.auc=TRUE,col="blue")
+glm.fit.roc=plot(roc(test$diabetes,predict(glm.fit.glucoseOnly,test,type="response")),print.auc=TRUE,print.auc.y=0.4,col="red",add=TRUE)
+par(pty="m")
+
+results=data.frame(sensitivity=glm.fit.roc$sensitivities,
+           specificity=glm.fit.roc$specificities,
+           threshold=glm.fit.roc$thresholds)
+View(results)
+```
+Q2. Which performed better _glm.fit_ or _glm.fit.glucoseOnly_?
+Q3. What probability threshold should you use if you required at least 80% sensitivity?
+Q4. What specificity do you achieve at the threshold needed for 80% sensitivity?
+Q5. What AUC would you expect to achieve for a model that just guesses randomly? (Think about it and then see if you are right by using the code below. It will add a column of random numbers to your training and test sets, fit a model to predict diabetes based on these random numbers and then make a new ROC)
+```{r}
+train$random=rnorm(nrow(train))
+test$random=rnorm(nrow(test))
+glm.fit.random = glm(diabetes ~ random, data = train, family = "binomial")
+glm.fit.roc=plot(roc(test$diabetes,predict(glm.fit,test,type="response")),print.auc=TRUE,col="blue")
+glm.fit.roc=plot(roc(test$diabetes,predict(glm.fit.glucoseOnly,test,type="response")),print.auc=TRUE,print.auc.y=0.4,col="red",add=TRUE)
+glm.fit.roc=plot(roc(test$diabetes,predict(glm.fit.random,test,type="response")),print.auc=TRUE,print.auc.y=0.3,col="yellow",add=TRUE)
+```
+
+---
+
+
+## Ridge & LASSO regression [Optional] (20mins)
+
+The code below shows how to perform ridge and lasso regression using the _glmnet_ package. The same function is used to perform both methods. When _alpha=0_ ridge regression is performed, when _alpha=1_ LASSO is performed.
+```{r}
+library(glmnet)
+par(pty="s")
+x=as.matrix(train[,1:8])
+y=train$diabetes
+x2=as.matrix(test[,1:8])
+y2=test$diabetes
+
+ridge.cv=cv.glmnet(x,y,alpha=0,family="binomial")
+ridge.fit=glmnet(x,y,family="binomial",alpha=0,lambda=ridge.cv$lambda.min)
+ridge.roc=roc(y2,predict(ridge.fit,x2,type="response"),col="red",plot=TRUE,print.auc=TRUE)
+
+lasso.cv=cv.glmnet(x,y,alpha=1,family="binomial")
+lasso.fit=glmnet(x,y,family="binomial", alpha=1, lambda=lasso.cv$lambda.min)
+lasso.roc=roc(y2,predict(lasso.fit,x2,type="response"),col="blue",plot=TRUE,print.auc=TRUE,print.auc.y=0.4,add=TRUE)
+
+coef(ridge.fit)
+coef(lasso.fit)
+par(pty="m")
+```
+Q1. What is the purpose of the lambda parameter used in ridge/lasso regression?
+Q2. Which features does lasso regression eliminate from the model?
+Q3. Which features does ridge regression eliminate from the model?
+Q4. In the example above, the _cv.glmnet_ function uses cross-validation to select an appropriate value to use for lambda (this value is saved as _lasso.cv$lambda.min_). What value did the cross validation return for _lasso.cv$lambda.min_?
+Q5. What AUC do you obtain if you redo lasso regression while setting _lambda=1_ instead of _lambda=lasso.cv$lambda.min_? Can you explain why the AUC changed in this way?
+Q6. In this example, do the results provide strong evidence to suggest extensive overfitting when you created _glm.fit_ without regularization? Justify your answer.
+
+
