@@ -285,6 +285,6 @@ Q4. In the example above, the _cv.glmnet_ function uses cross-validation to sele
 Q5. What AUC do you obtain if you redo lasso regression while setting _lambda=1_ instead of _lambda=lasso.cv$lambda.min_? Can you explain why the AUC changed in this way?
 0.5. I cannot explain this (will ask in future lecture)
 Q6. In this example, do the results provide strong evidence to suggest extensive overfitting when you created _glm.fit_ without regularization? Justify your answer.
-I would think so, seeing the change in AUC when lamba = 1 (not taken into account)
+I would think so, seeing the change in AUC when lamba = 1 (not taken into account
 
 
