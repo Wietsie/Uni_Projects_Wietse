@@ -9,7 +9,7 @@ In this session you will work with the Pima Indians Diabetes Database, a publicl
 
 Insert your answers to the questions into the R markdown document as you go. Save your version of your markdown document as _"practical1_YourStudentNumber.Rmd"_. You will submit this at the end of the practical.
 
-Student Number: [Insert your student number here]
+Student Number: 7014570
 
 ---
 
@@ -22,7 +22,10 @@ data(PimaIndiansDiabetes)
 View(PimaIndiansDiabetes)
 ```
 Q1. How many continuous variables does the dataset contain?
+7, all but pregnant & diabetes
 Q2. How many categorical variables does the dataset contain?
+1, diabetes
+
 
 The range function can be used to retrieve the min and max values within a given column. The table function can be used to count the number of observations across all observed values.
 ```{r}
@@ -30,6 +33,7 @@ range(PimaIndiansDiabetes$glucose)
 table(PimaIndiansDiabetes$pregnant)
 ```
 Q3. How many samples in the dataset have a BMI value that looks suspicious?
+11 (0 values/missing))
 
 _dplyr_ is a popular package for data analysis in R, it includes functions to perform several data-frame operations in a convenient and efficient manner (filtering, sorting, grouping, summarizing). A full exploration of _dplyr_ is beyond the scope of this course, however the code below demonstrates how we can use dplyr to create a new data frame where all samples above the age of 70 have been removed.
 ```{r}
