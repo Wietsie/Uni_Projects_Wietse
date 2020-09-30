@@ -58,7 +58,7 @@ ggplot(data=PimaIndiansDiabetes, aes(x=mass, y=pressure, col=diabetes)) + geom_p
 ```
 Q6. Examine your plot of blood pressure vs mass. Does it appear as though there is
 
- a) No correlation
+ a) Minimal correlation
 
 
 Q7. In the next code block we will use the _sample_ function to split our dataset into a training and test set. Before moving on try running "sample(1:5)" and "sample(1:5,3)" in your R session. What do you think this function does?
@@ -103,27 +103,35 @@ test$predPressure=predict(lm.fit,test)
 ```
 Q3. Adapt your previous ggplot code to now plot the observed pressure values against the predicted values for the training and test sets. (append _+ geom_abline(intercept=0,slope=1,col="blue")_ to add a line for perfect correlation)
 ```{r}
-ggplot(data=PimaIndiansDiabetes, aes(x=mass, y=pressure, col=diabetes)) + geom_point()
+ggplot(data=train, aes(x=pressure, y=predPressure, col=diabetes)) + geom_point() + geom_abline(intercept=0,slope=1,col="blue")
+ggplot(data=test, aes(x=pressure, y=predPressure, col=diabetes)) + geom_point() + geom_abline(intercept=0,slope=1,col="blue")
 ```
 Q4. Does the model perform equally well for predicting low pressure values (<55), intermediate values (55-80) and the higher values (>80)? Why do you think this is?
 
+Lower and higher values seem more difficult. There is less training data for these points
+
 The following will return the difference between your model's predictions of pressure and the real pressure values observed in the test set
 ```{r}
-test$pressure - test$predPressure
+mean(abs(test$pressure - test$predPressure))
+
 ```
 Q5. On average, how far off the real values were your predictions? (If your answer is <2 then look again...)
+
+8.76725
 
 Watch the first 6mins 20 secs of this introductory video to R-squared
 https://www.youtube.com/watch?v=2AQKmw14mHM
 
 Q6. In the code block below, _VarMean_ is the variation around the mean for pressure within your test set. Complete the code-block to calculate the R-squared for your model in the test set. (Hint:  _summary(lm.fit)_ shows you the correct R-squared for your model in the training set, you can check if your code works by first seeing if you can calculate the correct R-squared for the training set)
 ```{r}
-VarMean=sum((test$pressure - mean(test$pressure))^2)
-VarLine=#Insert your code here
-Rsquared=#Insert your code here
+VarMean=sum((train$pressure - mean(train$pressure))^2)
+VarLine=sum((train$pressure - train$predPressure)^2)
+Rsquared= (VarMean - VarLine)/VarMean
 ```
 
 Q7. Does your model achieve the same R-squared in your training and test sets? Explain why you might expect to see differences in model performance within the training and test sets?
+
+The R2 is found to be higher in the test set compared to the training set. Differences are to be expected since the dataset was randomly split
 
 The _caret_ package is one of the most popular interfaces for machine learning in R (For a brief introduction see http://topepo.github.io/caret/index.html). The code below will use functions from _caret_ to perform linear regression with 10 fold cross validation and then return the R-squared values calculated during each cross validation. 
 ```{r}
@@ -131,10 +139,12 @@ library(caret)
 nfolds=trainControl(method = "cv", number = 10)
 lm.fit.cv=train(pressure ~ mass, data = PimaIndiansDiabetes, trControl = nfolds, method = "lm") 
 lm.fit.cv$resample$Rsquared
+mean(lm.fit.cv$resample$Rsquared)
 ```
 Q8. What was the average R-squared value across cross-validations?
+0.1135001
 Q9. Which do you think is a more reliable indicator of model performance, the R-squared value you calculated in Q7 or the average R-squared value you calculated for Q8? Justify your answer
-
+Q8 since here n=10
 
 ## Logistic regression & Confusion Matrices (40 mins)
 The following code uses the _generalized linear model_ (glm) function to predict case-control status (diabetes positive or negative) from all other features in the data frame.
@@ -148,39 +158,64 @@ glm.fit=glm(diabetes ~ ., data=train,family="binomial")
 summary(glm.fit)
 ```
 Q1. Which features from the dataset show a significant correlation with diabetes?
+glucose levels, BMI/mass, insulin and #pregnancies
 Q2. _Hard question alert!!! (skip if you get stuck, we will discuss later)_ Is the feature with the largest Estimate by definition the most important in determining diabetes risk? Explain why. 
+
+No because you also need to look at the significance/p values
 
 The following code will use your model to predict risk of diabetes within the test set
 ```{r}
-predict(glm.fit,test,type="response")
+prediction <- predict(glm.fit,test,type="response")
+prediction = prediction %>% filter(prediction>0.8)
 ```
 Q3. How many people from the test set are estimated to have an 80% probability for a positive test result?
+18
 Q4. Rerun the prediction without specifying _type="response"_, ie run _predict(glm.fit,test)_. What do these values represent? (Hint - discussed during the lecture this morning...)
+log odds
 Q5. _Second hard question alert!!! (skip if you get stuck, we will discuss later)_ The values you analyzed in Q7 represent the probabilities that a sample within your dataset receives a positive test result for diabetes. A model that uses the same feature to calculate an individual's risk of diabetes in the real world will not provide the same answer. Why?
 
 The following code will assign samples "neg" or "pos" values based on whether the predicted probabilities of a positive test results were greater than 50%. It will then use a function from the _caret_ function to generate a confusion matrix.
 ```{r}
+library("e1071")
 test$predDiabetes=factor(ifelse(predict(glm.fit,test,type="response")<0.5,"neg","pos"),levels=c("neg","pos"))
 confusionMatrix(test$diabetes,test$predDiabetes)
+
 ```
 Q6. How many true positives are there?
+43
 Q7. How many false positives ares there?
+23
 Q8. How many true negatives are there?
+131
 Q9. How many false negatives are there?
+21
 Q10. Is the model more likely to provide an underestimate or overestimate of the number of samples with positive diabetes test results?
+
+overestimate
 Q11. Which do you imagine is most important in this situation: high accuracy, high specificity or high sensitivity?
 
+High sensitivity since a prediction model like this would be the first step in identifying people at risk of diabetes. High accuracy testing would likely follow
+
 Q12. Use the code below to refit your model using cross validation. What is the average accuracy across cv?
+--
 ```{r}
 nfolds=trainControl(method = "cv", number = 10)
 glm.fit.cv=train(diabetes ~ ., data = PimaIndiansDiabetes, trControl = nfolds, method = "glm", family="binomial")
+summary(glm.fit.cv)
+
+prediction2 <- predict(glm.fit.cv,test,type="prob")
+
+train$predDiabetes=factor(ifelse(predict(glm.fit.cv,train,type="prob")<0.5,"neg","pos"),levels=c("neg","pos"))
+confusionMatrix(train$diabetes,train$predDiabetes)
 ```
 
 
 ## ROC (20mins)
 Q1. Adapt the code you used to generate _glm.fit_ to fit a logistic regression model where the only predictor variable considered is _glucose_ (call this _glm.fit.glucoseOnly_). For this excersize do not worry about cross validation and just use your original training dataset 
 ```{r}
-glm.fit.glucoseOnly=#Insert your code here
+
+glm.fit.glucoseOnly=glm(diabetes ~ pressure, data=train,family="binomial")
+summary(glm.fit.glucoseOnly)
 ```
 
 The following code will use the _pROC_ package to generate ROC curves for your full _glm.fit_ model (all variables included) and your glucose only _glm.fit.glucoseOnly_ model. It will then generate a dataframe called _results_ which shows the sensitivity and specificity across a range of probability thresholds that could be used to classify test results as "pos" or "neg".
@@ -197,9 +232,13 @@ results=data.frame(sensitivity=glm.fit.roc$sensitivities,
 View(results)
 ```
 Q2. Which performed better _glm.fit_ or _glm.fit.glucoseOnly_?
+glm.fit
 Q3. What probability threshold should you use if you required at least 80% sensitivity?
+0.2863674
 Q4. What specificity do you achieve at the threshold needed for 80% sensitivity?
+0.25657895
 Q5. What AUC would you expect to achieve for a model that just guesses randomly? (Think about it and then see if you are right by using the code below. It will add a column of random numbers to your training and test sets, fit a model to predict diabetes based on these random numbers and then make a new ROC)
+0.5
 ```{r}
 train$random=rnorm(nrow(train))
 test$random=rnorm(nrow(test))
@@ -228,7 +267,7 @@ ridge.fit=glmnet(x,y,family="binomial",alpha=0,lambda=ridge.cv$lambda.min)
 ridge.roc=roc(y2,predict(ridge.fit,x2,type="response"),col="red",plot=TRUE,print.auc=TRUE)
 
 lasso.cv=cv.glmnet(x,y,alpha=1,family="binomial")
-lasso.fit=glmnet(x,y,family="binomial", alpha=1, lambda=lasso.cv$lambda.min)
+lasso.fit=glmnet(x,y,family="binomial", alpha=1, lambda=1)
 lasso.roc=roc(y2,predict(lasso.fit,x2,type="response"),col="blue",plot=TRUE,print.auc=TRUE,print.auc.y=0.4,add=TRUE)
 
 coef(ridge.fit)
@@ -236,10 +275,16 @@ coef(lasso.fit)
 par(pty="m")
 ```
 Q1. What is the purpose of the lambda parameter used in ridge/lasso regression?
+regularization
 Q2. Which features does lasso regression eliminate from the model?
+prevent overfitting
 Q3. Which features does ridge regression eliminate from the model?
+multicollinearity
 Q4. In the example above, the _cv.glmnet_ function uses cross-validation to select an appropriate value to use for lambda (this value is saved as _lasso.cv$lambda.min_). What value did the cross validation return for _lasso.cv$lambda.min_?
+0.01023981
 Q5. What AUC do you obtain if you redo lasso regression while setting _lambda=1_ instead of _lambda=lasso.cv$lambda.min_? Can you explain why the AUC changed in this way?
+0.5. I cannot explain this (will ask in future lecture)
 Q6. In this example, do the results provide strong evidence to suggest extensive overfitting when you created _glm.fit_ without regularization? Justify your answer.
+I would think so, seeing the change in AUC when lamba = 1 (not taken into account)
 
 
