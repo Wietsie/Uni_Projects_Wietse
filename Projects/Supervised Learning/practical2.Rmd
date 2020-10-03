@@ -1,0 +1,203 @@
+# Supervised learning day II
+
+In this session you will work with DNA methylation dataset from the paper by Capper et al. You will
+* Use decision trees, random forest and support vector machines to assign tumour type classifications based on DNA methylation profiles
+* You will use the _caret_ package (introduced in the last practical) to perform hyperparameter tuning
+* You will code your own cross validation loop to determine which algorithm provides the best classifier in this situation
+
+Links to the pre-processed dataset used in this excersize were obtained through a companion paper to the Capper et al study (Maros et al, 2020)
+
+Insert your answers to the questions into the R markdown document as you go. Save your version of your markdown document as _"practical2_YourStudentNumber.Rmd"_. You will submit this at the end of the practical by emailing it to K.P.Kenna@umcutrecht.nl.
+
+Student Number: [Insert your student number here]
+
+
+## The dataset (20 mins)
+Use the code block below to load the tumour labels and the corresponding DNA methylation data (beta -values) used in the study by Capper et al. You will need to update the code so that the files are loaded from your own Downloads folder.
+```{r}
+
+# Load labels
+load("/Users/kkenna/Downloads/y.RData")
+
+# Load single CV dataset
+load("/Users/kkenna/Downloads/betas.1.0.RData")
+
+# Merge data into a single data frame MethylationData
+MethylationData=data.frame(y=as.character(y), rbind(betas.train,betas.test))
+```
+
+Each row of MethylationData is a tumour sample. Each column shows a DNA methylation reading for one of 10,000 sites in the genome. These DNA measurements of DNA methylation were made using an Illumina 450k human methylation chip as described in Capper et al. The name of each column (eg "cg22054918") is not important, it is just an arbitrary label given to each oligonucleotide probe from the methylation chip. Values in MethylationData are shown as fraction methylated over total (methylated/(methylated + unmethylated)) for the probe for that CpG.The following commands will show you the first 10 rows/ 5 columns of the data, count the number of rows, count the number of columns and count the number of time each tumour class occurs.
+```{r}
+MethylationData[1:10,1:5]
+nrow(MethylationData)
+ncol(MethylationData)
+table(MethylationData$y)
+```
+Q1. What is the most frequent tumour class and how many times does it occur in the data?
+Q2. What is the least frequent tumour class and how many times does it occur in the data?
+
+Q3. This practical would be tediously slow if we included the entirety of the dataset for modeling. Instead, we will focus on predicting the 6 most frequent tumour classes using the 1000 most variable probes. Add the remainder of the 6 most frequent tumours to the vector named tumourKeep and run the code block (names should be in quotes and "," separated)
+```{r}
+library(dplyr)
+tumourKeep=c("GBM, RTK II")
+MethylationData=MethylationData %>% filter(y %in% tumourKeep)
+cv=apply(MethylationData[,2:ncol(MethylationData)],2,sd) / colMeans(MethylationData[,2:ncol(MethylationData)])
+featureKeep=c(TRUE,cv>=quantile(cv,0.90))
+MethylationData=MethylationData[,featureKeep]
+MethylationData$y=as.factor(MethylationData$y)
+```
+Q4. Why do you think we decided to keep only the 6 most common tumour classes?
+Q5. Why do you think we would select the 1000 most variable probes rather than 1000 random probes?
+Q6. The command _cv=apply(MethylationData[,2:ncol(MethylationData)],2,sd) / colMeans(MethylationData[,2:ncol(MethylationData)])_ calculates a coefficient of variation (https://en.wikipedia.org/wiki/Coefficient_of_variation) for every probe. The command _featureKeep=c(TRUE,cv>=quantile(cv,0.90))_ generates a _TRUE_ or _FALSE_ vector indicating which columns should be kept during the filtering process. The columns that are kept include the first column (tumour class) and any column where the coefficient of variation exceeds _quantile(cv,0.90))_. What does the number returned by _quantile(cv,0.90))_ represent?
+
+Q7. Complete the code block below to divide MethylationData data into a training and test. Place 70% of the data in the training set and 30% in the test set. (Refer to practical 1 if you get stuck)
+```{r}
+set.seed(1234)
+m=#Insert your code here
+index=#Insert your code here
+train=#Insert your code here
+test=#Insert your code here
+```
+
+
+## Decision trees (30 mins)
+Run the following code block to train a decision tree classifier for predicting tumour type base on all DNA methylation probes included in your training set. _rpart.plot_ will generate a (somewhat ugly) visual representation of your tree. We save this plot to a separate pdf using the _pdf_ function as this will make the plot easier to read (change the output folder to your downloads folder!). We use the _confusionMatrix_ function from the _caret_ package to generate a confusion matrix (check back to day 1 if you have forgotten what this is!) summarizing your model's performance on the test set. The confusion matrix will also summarise the sensitivity and specificity achieved by the model in predicting each of the 6 tumour classes.
+```{r}
+library(rpart)
+library(rpart.plot)
+tree.fit=rpart(y ~ .,data=train, method="class")
+pdf("/Users/kkenna/Downloads/tree_fit.pdf")
+rpart.plot(tree.fit,tweak=1.8)
+dev.off()
+tree.cm=caret::confusionMatrix(test$y,predict(tree.fit,test,type="class"))
+```
+Q1. Look at the decision tree plot and/or the summary generated by typing _tree.fit_. What rule is used to make the first split in the tree (at the root node)? 
+Q2. What % of the data is retained in the right child node of the first split?
+Q3. What tumour class is most frequent in the right child node of the first split? 
+Q4. What was the largest change in class probability observed when going from the root node to either child node at the first split?
+Q5. How many leaf nodes does your decision tree have?
+Q6. Review the confusion matrix. For which tumour class does your model have the highest sensitivity? 
+Q7. What was the most frequent misclassification event in the data (which 2 tumour types did your model get "mixed up" most frequently)? 
+
+
+## Random forests (20mins)
+```{r}
+library(randomForest)
+rf.fit=randomForest(y ~ ., data=train)
+varImpPlot(rf.fit)
+rf.cm=#Insert your code here
+```
+Q1. Complete the commented line beginning _rf.cm=_ to generate a test set confusion matrix for your random forest classifier. 
+Q2. Which model was better at tumour classification the decision tree or the random forest?
+Q3. Which tumour type does the random forest model predict least reliably?
+Q4. Look at the plot generated by _varImpPlot(rf.fit)_. Which DNA methylation site (probe) accounted for the most variance between tumour classes?
+Q5. Use the summary generated by _rf.fit_ to find out how many trees were generated for your random forest model?
+Q6. Use the summary generated by _rf.fit_ to find out how many DNA methylation probes were included at each split?
+
+
+## Support vector machines (25mins)
+Support vector machines (SVM) are a popular machine learning algorithm for a wide range of classification tasks. The key detail that we need to concern ourselves with is that svm allow for the use of different transformations of the data (kernels) to fit non-linear (non-straight line) decision boundaries.
+
+Watch the first 5mins of this video introduction to SVM:
+https://www.youtube.com/watch?v=Y6RRHw9uN9o
+Q1. The fitting of SVM is based on modelling _extreme data-points_ (support vectors). In this case, extreme data points refers to
+  a) Unreliable data-points
+  b) Data points that are furthest from the decision boundary established by the model
+  c) Data points >3 standard deviations from the mean
+  d) Data points that are closest to the decision boundary and most likely to be misclassified
+Q2. Which of the following is optimized during fitting of an svm?
+  a) Distance between support vectors and the decision boundary (hyperplane)
+  b) Distance between support vectors and the group mean
+  c) Distance between group means and the decision boundary
+  d) Distance between support vectors
+  
+We will model the Capper et al data using linear and radial basis function kernels 
+```{r}
+library(e1071)
+
+svml.fit=svm(y ~ ., data=train, kernel="linear")
+svml..cm=#Insert your code here
+
+svmr.fit=svm(y ~ ., data=train, kernel="radial")
+svmr.cm=#Insert your code here
+
+```
+Q3. Of all 4 of the models that you have fit, which achieved the highest accuracy during test set classification?
+
+
+# Hyperparamter tuning (45 mins)
+The caret package provides a single interface for model training, automated hyperparameter tuning and model validation using a wide variety of machine learning algorithms. Execute the following code to optimize hyperparameter values for a decision tree through repeated cross validation.
+
+```{r}
+library(caret)
+Tctrl=trainControl(method="repeatedcv", repeats = 3, number=5)
+Ttree.fit=train(y ~ .,data=train, method="rpart", trControl=Tctrl, tuneLength=5)
+ggplot(Ttree.fit)
+Ttree.cm=caret::confusionMatrix(test,predict(Ttree.fit,test))
+```
+Q1. The _trainControl_ function is used to control the training process (including evaluation of hyperparameters. (see caret documentation at https://cran.r-project.org/web/packages/caret/vignettes/caret.html). Which of the following is not a valid choice for the resampling (_methods_) option? (hint ?trainControl)
+  a) Bootstrapping
+  b) Repeated cross validation
+  c) Root mean square error
+  d) Leave one out cross validation
+Q2. Look at the plot generated by _ggplot(Ttree.fit)_. What hyperparamater was optimized using repeated cross validation?
+Q3. How many possible values of this hyperparameter were tested?
+Q4. Which value of this hyperparameter gave the best performance?
+Q5. This hyperparameter is used to balance the risk of underfitting and overfitting by your decision tree. What term (introduced during day 1) is used to refer to this fine-tuning process?
+Q6. Did the hyperparameter tuning with caret provide a decision tree that out-performed your original _rpart_ model? Why do you think that is? (Hint - explore running the following function on your original decision tree 'plotcp(tree.fit)')
+
+Try fitting a decision tree where the complexity parameter is specified manually.
+```{r}
+tree.fit2=rpart(y ~ .,data=train, method="class",control = rpart.control(cp = 0.06))
+tree.fit3=rpart(y ~ .,data=train, method="class",control = rpart.control(cp = 0.00001))
+```
+Q7. Use _rpart.plot_ function to visualize the above decision trees and compare them to the decision tree model you trained earlier. What is different about the results from _tree.fit2_ and _tree.fit3_?
+Q8. How does the performance of these trees compare with your original decision tree?
+
+By adjusting the value supplied to the method argument of the _train_ function, caret can be used to fit, tune and evaluate a large number of distinct machine learning algorithms.
+```{r}
+Tctrl=trainControl(method="repeatedcv", repeats = 3, number=5)
+fit=train(y ~ .,data=train, method="rf", trControl=Tctrl, tuneLength=5)
+ggplot(fit)
+```
+
+Q9. Refer to the documentation at https://topepo.github.io/caret/available-models.html. How many different models can the _train_ function be used to apply?
+Q10. What hyperparameter is optimized when apply the _rf_ random forest model?
+Q11. The optional section from day 1 involved using _glmnet_ to perform ridge/ LASSO regression. Run the above code block for the _glmnet_ method (This may take ~5mins). What hyperparameter values maximized model performance?
+Q12. What overall accuracy does the glmnet model achieve on the test set? 
+Q13. **When using caret to fit a model with cross validation/ repeated cross validation we typically will not need to also use a train / test split**. This is because we would just evaluate performance using the cv results generated by caret. Here we continued to use our previous train - test set split so that we could compare test set performance across all the models you generated Can you think of a better way to pick which of the models we tried works best for this task?
+
+
+
+## Optional - SVM kernels
+Q1. The course materials for today includes a png image file (decision_boundaries.png). Do you expect that both radial and linear kernels should work equally well in each setting?
+
+Try out the code block below to see
+```{r}
+# Generate dataset 1
+getCirc=function(n,R,x0,y0,label)
+{
+  t=2*pi*runif(n);
+  r=R*sqrt(runif(n));
+  x=x0+r*cos(t);
+  y=y0+r*sin(t);
+  return(data.frame(x=x,y=y,label=label))
+}
+df=rbind(getCirc(100,2,0,0,"Case"),getCirc(100,8,0,0,"Ctrl"))
+df$label=as.factor(df$label)
+
+# Generate dataset 2
+df2=data.frame(x=c(rnorm(100,1,1),rnorm(100,5,1)),y=c(rnorm(100,5,1),rnorm(100,1,1)), label=as.factor(rep(c("Case","Ctrl"),each=100)))
+
+# Apply svm with radial kernel to both datasets
+svmr.fit=svm(label ~ ., data=df,kernel="radial")
+plot(svmr.fit,df)
+svmr2.fit=svm(label ~ ., data=df2,kernel="radial")
+plot(svmr2.fit,df2)
+
+# Apply svm with linear kernel to both datasets
+svml.fit=svm(label ~ ., data=df,kernel="linear")
+plot(svml.fit,df)
+svml2.fit=svm(label ~ ., data=df2,kernel="linear")
+plot(svml2.fit,df2)
+```
