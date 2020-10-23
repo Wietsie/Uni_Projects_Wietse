@@ -1,0 +1,229 @@
+
+# Exercise 1
+
+
+## Tidy up some gene expression data
+
+let's load in 'tidyverse'. Notice that even loading the library looks more neat.
+`library(tidyverse)`
+
+Read in a data from the file "Brauer2008_DataSet1.tds" using read_delim. Storing it in a variable with a *useful* name.
+
+* The file is tab delimited.
+* Have a quick look at the data. What is the class of your variable?
+
+We will be building a pipeline to tidy up the data. First we will perform each step separately, without using the pipe symbol. Later we will use the pipe symbol to make a complete pipeline that runs all at once.
+
+
+```{r}
+library(tidyverse)
+
+```
+
+### Step 1: split up a column
+
+Have a look at the NAME column. Clearly there is information there that is more useful in more than one column. Find a function that can be used to split a column with a delimiter.
+
+*Hint: the separator here is '||', which has an extra meaning in code that looks at patterns. Without explaining too much, just use "\\\\|\\\\|" as the separator string*
+
+The resulting column names should correspond to the following names:
+
+```{r, eval=FALSE}
+c("name", "BP", "MF", "systematic_name", "number")
+```
+
+Use the function you found on the variable, store the result in a variable called 'step1'
+
+
+```{r}
+step1 <- separate(
+  B_dataset,
+  NAME,
+  c("name", "BP", "MF", "systematic_name", "number"),
+  sep = "\\|\\|",
+  remove = TRUE,
+  convert = FALSE,
+  extra = "warn",
+  fill = "warn"
+)
+
+
+
+```
+
+### Step 2: getting rid of unwanted 'whitespace'
+
+It may be a detail, but it is an important detail: if the column 'systematic_name' contains extra spaces, you cannot see it, but it will give trouble later. So, let's get rid of the white space. Change all new columns vars(name:systematic_name) using mutate_at the column *in place* so that all white space is gone.
+
+Use variable 'step1' in the function, put the result in a new variable called 'step2'
+
+
+```{r}
+step2 <- mutate_at(step1, vars(name:systematic_name), str_trim)
+
+```
+
+# Exercise 2
+
+
+### Step 3: remove uninteresting columns
+
+We are not interested in some of the columns, therefore they just take up memory. Again, find a function to remove the following columns: number, GID, YORF and GWEIGHT
+
+Do as before, results go into 'step3'.
+
+```{r}
+# remove unwanted columns
+step3 <- select(step2, -c(number, GID, YORF, GWEIGHT))
+```
+
+### Step 4: tidy up our columns: making single observation per row
+
+If you have a look at the output of step 3, you will notice there are a lot of columns that are actually variables. These are the names of samples. The first column name is "G0.05" and the last one is "U0.3". Use a tidyverse function that transforms these columns into:
+* one column called 'sample', which contains the column names
+* one column that contains the values that belong to each sample. Call this column 'expression'
+
+Output goes into variable 'step4'.
+
+
+```{r}
+# Make our data tidy
+step4 <- gather(step3, sample, expression, G0.05:U0.3)
+```
+
+### Step 5: Make use of the sample names
+
+Each sample name actually consists of the name (single letter) of a nutrient, and a number. Use the method you used before to split a column, to create two columns called "nutrient" and "rate"
+
+Make sure that the function tries to convert the split values to numbers using the 'convert' parameter. Split the column at the first character.
+
+Guess what: the output goes into 'step5'
+
+
+```{r}
+step5 <- separate(
+  step4,
+  sample,
+  c("nutrient", "rate"),
+  sep = 1,
+  remove = TRUE,
+  convert = TRUE,
+  extra = "warn",
+  fill = "warn"
+)
+
+```
+
+### Final step: remove unwanted observations
+
+Some of the measurements have not worked and therefore were 'NA'. Remove these. Moreover, if you look at the values in 'systematic_name' unfortunately some of these are not present. Filter these rows out as well. This can be done in one command.
+
+The result goes into a variable called 'cleaned_data1'
+
+
+```{r}
+cleaned_data1 <- filter(step5, !is.na(expression) & systematic_name != " ")
+```
+
+# Exercise 3
+
+#### ... but first
+
+To keep things readable, R allows lines of code to be split over several lines of text, but you will have to make clear that the code continues on the next line.
+
+To do that, always end the lines with an operator that needs something on the right hand side. An example is:
+
+This works the same way for %>% pipes.
+
+
+```{r}
+a <- 4 +
+3
+
+a
+```
+
+This will not work the way you may expect it to:
+
+
+```{r}
+a <- 4
++ 3
+
+a
+```
+
+## Create a pipeline
+
+We have done everything in separate steps so far. Now, connect everything together in a single cell, so going from your imported data frame create a pipeline.
+
+A pipeline works by connecting functions with the 'pipe' symbol %>%. Think of this symbol of streaming the data through the functions. The functions should not have the 'data' argument, because that is supplied by the %>% operator.
+
+
+First let's demonstrate the %>% operator with the famous iris data
+```{r}
+library(datasets)
+head(iris)
+iris %>% mutate(Sepal.Area = pi/4 * (Sepal.Length * Sepal.Width))
+
+# you can chain this together
+iris %>% mutate(Sepal.Area = pi/4 * (Sepal.Length * Sepal.Width)) %>% mutate(Petal.Area = pi/4 * (Petal.Length * Petal.Width))
+
+# But note (this is extra information) mutate can handle multiple operations
+iris %>% mutate(Sepal.Area = pi/4 * (Sepal.Length * Sepal.Width), Petal.Area = pi/4 * (Petal.Length * Petal.Width))
+
+```
+
+The data goes into the same variable 'cleaned_data2'
+
+
+```{r}
+# Perform cleaning in one pipeline
+cleaned_data2 <- B_dataset %>%
+  
+  separate(NAME, c("name", "BP", "MF", "systematic_name", "number"), sep = "\\|\\|",
+  remove = TRUE, convert = FALSE) %>%
+  
+    mutate_at(vars(name:systematic_name), str_trim) %>%
+  
+      select( -c(number, GID, YORF, GWEIGHT)) %>%
+  
+        gather(sample, expression, G0.05:U0.3) %>%
+  
+          separate(sample, c("nutrient", "rate"), sep = 1, remove = TRUE, convert = TRUE) %>%
+  
+            filter(!is.na(expression) & systematic_name != " ")
+```
+# Summaries
+
+One thing that tidyverse do very well is working on subgroups of data, and give summaries. These can help to find out if everything looks as expected
+
+```{r}
+print(summarise(cleaned_data1))
+summary_cleaned_data2 <- summarise(cleaned_data2)
+
+```
+
+
+# BONUS visualization
+
+Here is just a cell to show that your steps have worked. We're selecting only those cells that are involved with the biological process (BP) "leucine biosynthesis" (there are four) and handing this data to the ggplot function. We will be focusing on ggplot later.
+
+This is just to show that ggplot2 feels right at home in the tidyverse.
+
+
+```{r}
+cleaned_data1 %>%
+  filter(BP == "leucine biosynthesis") %>%
+  ggplot(aes(x=rate, y=expression, color=nutrient, group=name)) +
+  geom_point() +
+  geom_smooth(method= lm, se = TRUE) +
+  facet_wrap(.~name + systematic_name) 
+
+cleaned_data2 %>%
+  filter(BP == "leucine biosynthesis") %>%
+  ggplot(aes(x=rate, y=expression, color=nutrient, group=name)) +
+  geom_point() +
+  geom_smooth(method= lm, se = TRUE) +
+  facet_wrap(.~name + systematic_name) 
+```
